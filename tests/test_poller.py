@@ -1,4 +1,6 @@
 import json
+import os
+import threading
 import logging
 
 from app.poller import fan_running, publish_errors, publish_readings
@@ -67,3 +69,37 @@ def test_fan_running_distinguishes_missing_from_stopped():
     assert fan_running({("SUP fan active", (0, 0, 0)): "1"}, "SUP fan active") is True
     assert fan_running({("SUP fan active", (0, 0, 0)): "0"}, "SUP fan active") is False
     assert fan_running({}, "SUP fan active") is None
+
+
+def test_interruptible_sleep_returns_immediately_on_shutdown(monkeypatch):
+    import time as _time
+    from app import poller
+
+    monkeypatch.setattr(poller, "SHUTDOWN", threading.Event())
+    poller.SHUTDOWN.set()
+    started = _time.monotonic()
+    poller.interruptible_sleep(30)
+    # Without the event it would block for 30s; docker would then SIGKILL us.
+    assert _time.monotonic() - started < 1.0
+
+
+def test_interruptible_sleep_waits_when_not_shutting_down(monkeypatch):
+    import time as _time
+    from app import poller
+
+    monkeypatch.setattr(poller, "SHUTDOWN", threading.Event())
+    started = _time.monotonic()
+    poller.interruptible_sleep(0.2)
+    assert _time.monotonic() - started >= 0.15
+
+
+def test_signal_handler_sets_the_shutdown_flag(monkeypatch):
+    import logging as _logging
+    import signal as _signal
+    from app import poller
+
+    monkeypatch.setattr(poller, "SHUTDOWN", threading.Event())
+    poller.install_signal_handlers(_logging.getLogger("test"))
+    assert not poller.SHUTDOWN.is_set()
+    os.kill(os.getpid(), _signal.SIGTERM)
+    assert poller.SHUTDOWN.wait(2)

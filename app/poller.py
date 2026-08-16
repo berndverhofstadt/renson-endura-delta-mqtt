@@ -2,7 +2,9 @@
 import json
 import logging
 import os
+import signal
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -32,6 +34,28 @@ except ImportError:
         from shared.renson_client import RensonClient
     except ImportError:
         raise SystemExit("Shared catalog/client files are required in the sibling 'shared' directory.")
+
+
+# Set by SIGTERM/SIGINT. Docker sends SIGTERM on stop, and Python's default
+# handling would kill the process outright: no "offline" published, no flush of
+# in-flight QoS 1 messages, and a 10 second wait for the SIGKILL. Sleeping on
+# this event instead of time.sleep() makes shutdown immediate and orderly.
+SHUTDOWN = threading.Event()
+
+
+def install_signal_handlers(logger):
+    def handler(signum, frame):
+        logger.info("shutdown_signal signal=%s", signal.Signals(signum).name)
+        SHUTDOWN.set()
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, handler)
+
+
+def interruptible_sleep(seconds):
+    """Sleep, but wake immediately if a shutdown signal arrives."""
+    if seconds > 0:
+        SHUTDOWN.wait(seconds)
 
 
 def publish_status_quietly(bridge, topic, value, logger):
@@ -100,6 +124,7 @@ def main():
     logging.basicConfig(level=getattr(logging, config["log_level"], logging.INFO),
                         format="%(asctime)s %(levelname)s %(message)s")
     logger = logging.getLogger("renson_bridge")
+    install_signal_handlers(logger)
 
     poll_interval = config["poll_interval_seconds"]
     base_topic = config["mqtt_base_topic"].rstrip("/")
@@ -158,7 +183,7 @@ def main():
 
     consecutive_failures = 0
     try:
-        while True:
+        while not SHUTDOWN.is_set():
             cycle_started = time.monotonic()
             try:
                 # Apply queued commands before reading, so this cycle publishes
@@ -213,7 +238,7 @@ def main():
 
                 if consecutive_failures >= CIRCUIT_BREAKER_FAILURE_THRESHOLD:
                     logger.warning("circuit_breaker_triggered cooldown_seconds=%s", COOLDOWN_SECONDS)
-                    time.sleep(COOLDOWN_SECONDS)
+                    interruptible_sleep(COOLDOWN_SECONDS)
                     consecutive_failures = 0
                     publish_status_quietly(bridge, f"{base_topic}/status/consecutive_failures", 0, logger)
                     logger.warning("circuit_breaker_reset")
@@ -230,9 +255,9 @@ def main():
             else:
                 sleep_for = max(0.0, poll_interval - elapsed)
 
-            if sleep_for > 0:
-                time.sleep(sleep_for)
+            interruptible_sleep(sleep_for)
     finally:
+        logger.info("shutting_down")
         bridge.close()
         health_server.shutdown()
         health_server.server_close()
