@@ -1,5 +1,7 @@
 # renson-endura-delta-mqtt
 
+[![CI](https://github.com/berndverhofstadt/renson-endura-delta-mqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/berndverhofstadt/renson-endura-delta-mqtt/actions/workflows/ci.yml)
+
 MQTT bridge for the **Renson Endura Delta** ventilation unit, for openHAB and
 Home Assistant. Reads every value the unit exposes, publishes it to MQTT, and
 accepts a safe set of controls back — including a **filter-reset button**, so you
@@ -47,10 +49,26 @@ persistence (or HA recorder) as the historian.
 
 ## Quick start
 
+A multi-arch image (amd64 + arm64, so a Raspberry Pi works) is published on every
+push to `main`:
+
 ```bash
-git clone <this repo> && cd renson-endura-delta-mqtt
-cp .env.example .env
+curl -O https://raw.githubusercontent.com/berndverhofstadt/renson-endura-delta-mqtt/main/.env.example
+mv .env.example .env
 $EDITOR .env          # RENSON_HOST and MQTT_HOST are required
+
+docker run -d --name renson-bridge --restart unless-stopped \
+  --env-file .env -p 8081:8080 \
+  ghcr.io/berndverhofstadt/renson-endura-delta-mqtt:main
+```
+
+Or build it yourself:
+
+```bash
+git clone https://github.com/berndverhofstadt/renson-endura-delta-mqtt
+cd renson-endura-delta-mqtt
+cp .env.example .env
+$EDITOR .env
 docker compose up -d
 ```
 
