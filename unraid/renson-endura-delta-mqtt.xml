@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>renson-bridge</Name>
+  <Repository>ghcr.io/berndverhofstadt/renson-endura-delta-mqtt:main</Repository>
+  <Registry>https://github.com/berndverhofstadt/renson-endura-delta-mqtt/pkgs/container/renson-endura-delta-mqtt</Registry>
+  <Project>https://github.com/berndverhofstadt/renson-endura-delta-mqtt</Project>
+  <Support>https://github.com/berndverhofstadt/renson-endura-delta-mqtt/issues</Support>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <WebUI/>
+  <Icon/>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>An MQTT broker, and a Renson Endura Delta reachable from this server.</Requires>
+  <Category>HomeAutomation: Network:Other</Category>
+  <Overview>
+    MQTT bridge for the Renson Endura Delta ventilation unit, for openHAB and Home Assistant.
+    Reads every value the unit exposes over its local HTTP API and publishes it to MQTT, with
+    optional Home Assistant style auto-discovery. Also offers a filter-reset button, so you no
+    longer need the Renson app for that.
+
+    No cloud and no Renson account: it talks only to the unit on your LAN. Stateless, so there
+    are no volumes to map.
+
+    RENSON_HOST and MQTT_HOST are required. Everything else has a sensible default.
+
+    Safety note: this bridge deliberately cannot stop your ventilation. Doing so over the API
+    latches critical fan errors that need a physical power cycle to clear. A fire-alarm stop
+    needs a dry contact on the unit's 24 V DC input - see docs/FIRE_SAFETY.md in the project.
+  </Overview>
+
+  <Config Name="Renson host" Target="RENSON_HOST" Default="" Mode="" Type="Variable"
+          Display="always" Required="true" Mask="false"
+          Description="IP address of the Endura Delta, e.g. 192.168.1.60">
+  </Config>
+
+  <Config Name="MQTT host" Target="MQTT_HOST" Default="" Mode="" Type="Variable"
+          Display="always" Required="true" Mask="false"
+          Description="Hostname or IP of your MQTT broker">
+  </Config>
+
+  <Config Name="MQTT port" Target="MQTT_PORT" Default="1883" Mode="" Type="Variable"
+          Display="always" Required="false" Mask="false"
+          Description="1883 plain, 8883 for TLS. TLS is enabled automatically on 8883/8884/443.">1883</Config>
+
+  <Config Name="MQTT username" Target="MQTT_USERNAME" Default="" Mode="" Type="Variable"
+          Display="always" Required="false" Mask="false"
+          Description="Leave blank for an anonymous broker">
+  </Config>
+
+  <Config Name="MQTT password" Target="MQTT_PASSWORD" Default="" Mode="" Type="Variable"
+          Display="always" Required="false" Mask="true"
+          Description="Stored masked in the Unraid UI">
+  </Config>
+
+  <Config Name="MQTT base topic" Target="MQTT_BASE_TOPIC" Default="home/ventilation/renson"
+          Mode="" Type="Variable" Display="always" Required="false" Mask="false"
+          Description="State is published under this prefix; commands under &lt;base&gt;/set/">home/ventilation/renson</Config>
+
+  <Config Name="Poll interval (seconds)" Target="POLL_INTERVAL_SECONDS" Default="15" Mode=""
+          Type="Variable" Display="always" Required="false" Mask="false"
+          Description="How often to read the unit. Minimum 5.">15</Config>
+
+  <Config Name="Home Assistant auto-discovery" Target="MQTT_DISCOVERY_ENABLED" Default="false"
+          Mode="" Type="Variable" Display="always" Required="false" Mask="false"
+          Description="true to publish discovery configs. openHAB and Home Assistant both consume these.">false</Config>
+
+  <Config Name="Enable controls" Target="CONTROLS_ENABLED" Default="true" Mode=""
+          Type="Variable" Display="always" Required="false" Mask="false"
+          Description="false for a read-only bridge that never writes to the unit">true</Config>
+
+  <Config Name="Timezone" Target="TZ" Default="UTC" Mode="" Type="Variable"
+          Display="always" Required="false" Mask="false"
+          Description="Only affects log timestamps, e.g. Europe/Brussels">UTC</Config>
+
+  <Config Name="Log level" Target="LOG_LEVEL" Default="INFO" Mode="" Type="Variable"
+          Display="advanced" Required="false" Mask="false"
+          Description="DEBUG, INFO, WARNING or ERROR">INFO</Config>
+
+  <Config Name="Health port (host)" Target="8080" Default="8081" Mode="tcp" Type="Port"
+          Display="advanced" Required="false" Mask="false"
+          Description="Optional. Exposes /health for monitoring; the container healthcheck works without it.">8081</Config>
+
+  <Config Name="MQTT TLS" Target="MQTT_TLS" Default="" Mode="" Type="Variable"
+          Display="advanced" Required="false" Mask="false"
+          Description="Leave blank to decide from the port. Set true or false to force it.">
+  </Config>
+
+  <Config Name="Renson port" Target="RENSON_PORT" Default="80" Mode="" Type="Variable"
+          Display="advanced" Required="false" Mask="false"
+          Description="The unit serves plain HTTP on port 80">80</Config>
+
+  <Config Name="Renson timeout (seconds)" Target="RENSON_TIMEOUT_SECONDS" Default="8" Mode=""
+          Type="Variable" Display="advanced" Required="false" Mask="false"
+          Description="HTTP timeout per request">8</Config>
+
+  <Config Name="Discovery prefix" Target="MQTT_DISCOVERY_PREFIX" Default="homeassistant" Mode=""
+          Type="Variable" Display="advanced" Required="false" Mask="false"
+          Description="Second topic tree for discovery configs">homeassistant</Config>
+
+  <Config Name="Discovery device id" Target="MQTT_DISCOVERY_DEVICE_ID"
+          Default="renson_endura_delta" Mode="" Type="Variable" Display="advanced"
+          Required="false" Mask="false"
+          Description="Must be unique per unit if you run more than one">renson_endura_delta</Config>
+
+  <Config Name="Discovery device name" Target="MQTT_DISCOVERY_DEVICE_NAME"
+          Default="Renson Endura Delta" Mode="" Type="Variable" Display="advanced"
+          Required="false" Mask="false"
+          Description="Shown as the device name in openHAB / Home Assistant">Renson Endura Delta</Config>
+
+  <Config Name="Expose installer settings" Target="EXPOSE_INSTALLER_SETTINGS" Default="false"
+          Mode="" Type="Variable" Display="advanced" Required="false" Mask="false"
+          Description="Exposes commissioning values as controls. Wrong values will mis-balance the unit. Leave false unless you know why you need it.">false</Config>
+
+  <Config Name="Fire alarm topic" Target="FIRE_ALARM_TOPIC" Default="" Mode="" Type="Variable"
+          Display="advanced" Required="false" Mask="false"
+          Description="Optional. Mirrors this topic and verifies the unit actually stopped. The bridge never stops the fans itself.">
+  </Config>
+
+  <Config Name="Fire alarm ON payloads" Target="FIRE_ALARM_PAYLOAD_ON"
+          Default="1,on,true,open,alarm,fire" Mode="" Type="Variable" Display="advanced"
+          Required="false" Mask="false"
+          Description="Comma separated payloads that mean the alarm is active">1,on,true,open,alarm,fire</Config>
+
+  <Config Name="Health port (container)" Target="HEALTHCHECK_PORT" Default="8080" Mode=""
+          Type="Variable" Display="advanced" Required="false" Mask="false"
+          Description="Port inside the container serving /health. Change the Port mapping to match.">8080</Config>
+
+  <Config Name="Debug mode" Target="DEBUG_MODE" Default="false" Mode="" Type="Variable"
+          Display="advanced" Required="false" Mask="false"
+          Description="true logs the publishes it would make instead of sending them. For troubleshooting only.">false</Config>
+</Container>

@@ -16,7 +16,9 @@ COPY tests ./tests
 
 EXPOSE 8080
 
+# Honour HEALTHCHECK_PORT rather than hardcoding 8080, so changing the variable
+# does not leave the container reporting unhealthy while it works fine.
 HEALTHCHECK --interval=60s --timeout=5s --start-period=20s \
-  CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health').status == 200 else 1)" || exit 1
+  CMD python -c "import os, sys, urllib.request; port = os.getenv('HEALTHCHECK_PORT', '8080'); sys.exit(0 if urllib.request.urlopen(f'http://127.0.0.1:{port}/health').status == 200 else 1)" || exit 1
 
 CMD ["python", "-m", "app.poller"]

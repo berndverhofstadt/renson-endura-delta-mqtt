@@ -62,6 +62,10 @@ docker run -d --name renson-bridge --restart unless-stopped \
   ghcr.io/berndverhofstadt/renson-endura-delta-mqtt:main
 ```
 
+On **Unraid**, use container variables rather than an env file - there is a
+ready-made template and step-by-step instructions in
+[docs/UNRAID.md](docs/UNRAID.md).
+
 Or build it yourself:
 
 ```bash
