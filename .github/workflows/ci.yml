@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Run tests
+        run: python -m pytest tests -q
+        env:
+          PYTHONPATH: .
+
+      # The committed openHAB config is generated from shared/fields.py. If the
+      # catalog changes without regenerating, they drift apart silently - so fail
+      # the build instead.
+      - name: Committed openHAB config matches the field catalog
+        run: |
+          python -m tools.generate_openhab_config --output-dir /tmp/openhab
+          diff -ru openhab /tmp/openhab
+        env:
+          PYTHONPATH: .
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # QEMU so the arm64 image builds too: plenty of home servers running this
+      # will be a Raspberry Pi or similar.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      # Pull requests build but do not publish: no push access, and no reason to
+      # put unreviewed images in the registry.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the built image
+        if: github.event_name == 'pull_request'
+        run: |
+          docker buildx build --load -t renson-bridge:ci .
+          # No broker or unit reachable in CI, so just prove the entrypoint runs
+          # and fails on the missing required config rather than on an import error.
+          output=$(docker run --rm renson-bridge:ci 2>&1 || true)
+          echo "$output"
+          echo "$output" | grep -q "RENSON_HOST must be set"

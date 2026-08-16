@@ -1,0 +1,45 @@
+services:
+  renson-bridge:
+    build:
+      context: .
+    container_name: renson-bridge
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RENSON_HOST: ${RENSON_HOST}
+      RENSON_PORT: ${RENSON_PORT:-80}
+      RENSON_TIMEOUT_SECONDS: ${RENSON_TIMEOUT_SECONDS:-8}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-15}
+      MQTT_HOST: ${MQTT_HOST}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_TLS: ${MQTT_TLS:-false}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_BASE_TOPIC: ${MQTT_BASE_TOPIC:-home/ventilation/renson}
+      MQTT_DISCOVERY_ENABLED: ${MQTT_DISCOVERY_ENABLED:-false}
+      MQTT_DISCOVERY_PREFIX: ${MQTT_DISCOVERY_PREFIX:-homeassistant}
+      MQTT_DISCOVERY_DEVICE_ID: ${MQTT_DISCOVERY_DEVICE_ID:-renson_endura_delta}
+      MQTT_DISCOVERY_DEVICE_NAME: ${MQTT_DISCOVERY_DEVICE_NAME:-Renson Endura Delta}
+      CONTROLS_ENABLED: ${CONTROLS_ENABLED:-true}
+      EXPOSE_INSTALLER_SETTINGS: ${EXPOSE_INSTALLER_SETTINGS:-false}
+      FIRE_ALARM_TOPIC: ${FIRE_ALARM_TOPIC:-}
+      FIRE_ALARM_PAYLOAD_ON: ${FIRE_ALARM_PAYLOAD_ON:-1,on,true,open,alarm,fire}
+      # Log timestamps only; the device reports its own local time separately.
+      TZ: ${TZ:-UTC}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      HEALTHCHECK_PORT: ${HEALTHCHECK_PORT:-8080}
+      DEBUG_MODE: ${DEBUG_MODE:-false}
+    ports:
+      - "8081:8080"
+
+# Default bridge networking is enough: the container needs the Renson unit on
+# the LAN and the MQTT broker, wherever that lives. If your broker is another
+# container on this host, join its network instead:
+#
+#    networks:
+#      - mqtt-net
+#
+# networks:
+#   mqtt-net:
+#     external: true

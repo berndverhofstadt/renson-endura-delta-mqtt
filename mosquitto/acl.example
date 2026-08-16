@@ -1,0 +1,30 @@
+# Mosquitto ACL entries for the Renson bridge.
+# Append to your acl_file and reload mosquitto.
+
+# Restrict renson to specific topics
+user renson
+topic readwrite home/ventilation/renson/#
+
+# Only needed when MQTT_DISCOVERY_ENABLED=true. The bridge publishes one
+# discovery config per entity, across several component types.
+topic readwrite homeassistant/sensor/renson_endura_delta/#
+topic readwrite homeassistant/binary_sensor/renson_endura_delta/#
+topic readwrite homeassistant/select/renson_endura_delta/#
+topic readwrite homeassistant/number/renson_endura_delta/#
+topic readwrite homeassistant/switch/renson_endura_delta/#
+topic readwrite homeassistant/button/renson_endura_delta/#
+
+# Only needed when FIRE_ALARM_TOPIC is set: the bridge subscribes to the alarm
+# topic published by something else, so read is enough.
+topic read home/fire/alarm
+
+
+# The CONSUMER needs access too - easy to forget, because the bridge will look
+# perfectly healthy while openHAB sees nothing at all. Grant your openHAB user
+# read on the state tree, and on the discovery tree if you use auto-discovery.
+# Write is only needed once you enable CONTROLS_ENABLED and want to command the
+# unit from openHAB.
+user openhab
+topic read home/ventilation/renson/#
+topic read homeassistant/#
+# topic write home/ventilation/renson/set/#
